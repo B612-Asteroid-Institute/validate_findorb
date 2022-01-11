@@ -40,3 +40,5 @@ Then check if its properly installed by typing in the python command line,
 ---
 BIG NOTE:
 **This project is still in active development** and will have documentation soon!
+
+If you have any more questions email me here: aidan@b612foundation.org
