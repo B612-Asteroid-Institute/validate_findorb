@@ -71,7 +71,7 @@ def runFO(orbit, observatory_code, t0, dts, astrometric_error=None, backend=FIND
 
     od_orbit_df, residuals,ret2 = backend._orbitDetermination(ephemeris, out_dir=outd)
  
-    od_orbit = Orbits.from_df(od_orbit_df)
+    od_orbit = Orbits(od_orbit_df)
     
     prop_orbit,ret3 = backend._propagateOrbits(orbit, observation_times[-1:], out_dir=outd)
 
@@ -139,5 +139,12 @@ def loadOrb(data):
     return Orbits(data)
 
 def getOrbHorizons(target, t0):
-    hobj = Horizons(id=target,epochs=t0.tdb.mjd,location='@sun').vectors()
-    return Orbits(hobj.to_pandas(),ids=hobj['targetname'].values)
+    # Get the orbital elements from Horizons
+    if type(target) == str:
+        target = [target]
+    targets_i = []
+    for i in target:
+        hobj = Horizons(id=i,epochs=t0.tdb.mjd,location='@sun').vectors()
+        targets_i.append(hobj.to_pandas())
+    targets = pd.concat(targets_i, ignore_index=True)
+    return Orbits(targets,ids=targets['targetname'].values,epochs=t0+np.zeros(len(target)))

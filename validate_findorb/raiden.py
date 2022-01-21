@@ -33,22 +33,22 @@ class Orbits():
         else:
             raise ValueError("Input data must contain either 'epoch' or 'mjd_tdb' time column")
         
-        self.num_orbits = self.df.shape[0]
+        self.num_orbits = self.data.shape[0]
         
-        if 'orbit_id' in self.df.columns:
+        if 'orbit_id' in self.data.columns:
             self.ids = self.data['orbit_id'].to_numpy(dtype='<U60')
         elif ids is not None:
             self.ids = ids
         else:
             self.ids = f'{np.arange(self.num_orbits)}'
         if 'H' in self.data.columns:
-            self.H = self.df['H'].values
+            self.H = self.data['H'].values
         elif H is not None:
             self.H = H
         else:
             self.H = None
         if 'G' in self.data.columns:
-            self.G = self.df['G'].values
+            self.G = self.data['G'].values
         elif G is not None:
             self.G = G
         else:
