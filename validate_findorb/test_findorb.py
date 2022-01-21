@@ -3,9 +3,10 @@ import numpy as np
 import pandas as pd
 from astropy.time import Time
 from astropy import units as u
+from astroquery.jplhorizons import Horizons
 from shutil import copy
-from thor.orbits import Orbits
-from thor.backend import FINDORB
+from raiden import Orbits
+from wrapper import FINDORB
 backend=FINDORB()
 
 def sear(di):
@@ -22,7 +23,7 @@ def ch(di):
         
     return 'no_dir'
 
-def bashgen(out_dir):
+def bashgen(out_dir, error, t1):
     od = os.path.join(out_dir,'masterRunTEST.sh')
     val=Time.now().utc.value.isoformat(timespec='seconds')
     copy(os.path.dirname(os.path.abspath(__file__))+'/eph2ades.py',out_dir+'/eph2ades.py')
@@ -35,15 +36,15 @@ def bashgen(out_dir):
         f.write('python eph2ades.py '
                 +os.path.join('./ephemeris/500/',ch(ed1),'ephemeris.txt')+
                 ' '+os.path.join('./orbit_determination',psvp)+' '
-               +f'--astrometric_error={0.} --time_error={0.01}'+'\n')
+               +f'--astrometric_error={error} --time_error={0.01}'+'\n')
         f.write('cd orbit_determination/'+'\n')
         ed=os.path.join(out_dir,'orbit_determination/')
-        f.write(f'fo "{psvp}" -O "{ch(ed1)}" -tEjd2459029.5008007498 -j -D "environ.dat"'+'\n'+'cd ..'+'\n') # possibly hardcoded with -tEjd time
+        f.write(f'fo "{psvp}" -O "{ch(ed1)}" -tEjd{t1} -j -D "environ.dat"'+'\n'+'cd ..'+'\n') # possibly hardcoded with -tEjd time
         f.write('cd propagation/'+'\n')
         ed=os.path.join(out_dir,'propagation/')
         f.write('bash '+f"'{sear(ed)}'")
 
-def testFO(orbit, observatory_code, t0, dts, astrometric_error=None, backend=FINDORB(),out=None):
+def runFO(orbit, observatory_code, t0, dts, astrometric_error=None, backend=FINDORB(),out=None):
     if out is None:
         outd=None
     else:
@@ -108,6 +109,35 @@ def testFO(orbit, observatory_code, t0, dts, astrometric_error=None, backend=FIN
     result.insert(5, "astrometric_error [mas]", astrometric_error)
     result.insert(3, "num_obs", len(ephemeris))
     if out is not None:
-        bashgen(outd)
+        bashgen(outd,astrometric_error,observation_times[-1:].utc.jd)
     
     return result
+
+def testFO(orbits, observatory_code, t0, dts, astrometric_error=None, out=None):
+    try:
+        dts[0][0]
+    except:
+        dts = [dts]
+    try:
+        astrometric_error[0]
+        errors = astrometric_error
+    except:
+        errors = [astrometric_error]
+    results_i = []
+    for i in range(orbits.num_orbits):
+        for j in range(len(dts)):
+            for k in range(len(errors)):
+                result = runFO(orbits[i],observatory_code,t0,dts[j],astrometric_error=errors[k])
+                results_i.append(result)
+    results = pd.concat(
+        results_i,
+        ignore_index=True
+    )
+    return results
+
+def loadOrb(data):
+    return Orbits(data)
+
+def getOrbHorizons(target, t0):
+    hobj = Horizons(id=target,epochs=t0.tdb.mjd,location='@sun').vectors()
+    return Orbits(hobj.to_pandas(),ids=hobj['targetname'].values)
