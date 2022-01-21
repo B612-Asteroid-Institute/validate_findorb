@@ -5,8 +5,8 @@ from astropy.time import Time
 from astropy import units as u
 from astroquery.jplhorizons import Horizons
 from shutil import copy
-from raiden import Orbits
-from wrapper import FINDORB
+from .raiden import Orbits
+from .wrapper import FINDORB
 backend=FINDORB()
 
 def sear(di):

@@ -10,7 +10,7 @@ from astropy.time import Time
 
 #from ..utils import writeToADES
 #from .backend import Backend
-from eph2ades import ADES
+from .eph2ades import ADES
 aobj=ADES(None,None,None,None,None)
 
 FINDORB_CONFIG = {
