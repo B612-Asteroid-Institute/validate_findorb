@@ -96,9 +96,9 @@ def runFO(orbit, observatory_code, t0, dts, astrometric_error=None, backend=FIND
     result["delta vx [m/s]"] = (delta_state[:,3] * u.AU / u.d).to(u.m / u.s).value
     result["delta vy [m/s]"] = (delta_state[:,4] * u.AU / u.d).to(u.m / u.s).value
     result["delta vz [m/s]"] = (delta_state[:,5] * u.AU / u.d).to(u.m / u.s).value
-    result["rms delta ra"] = np.sqrt(np.mean(residuals["dRA"].values**2))
-    result["rms delta dec"] = np.sqrt(np.mean(residuals["dDec"].values**2))
-    result["rms delta time"] = np.sqrt(np.mean(residuals["dTime"].values**2))
+    result["rms delta ra [arcsec]"] = np.sqrt(np.mean(residuals["dRA"].values**2))
+    result["rms delta dec [arcsec]"] = np.sqrt(np.mean(residuals["dDec"].values**2))
+    result["rms delta time [seconds]"] = np.sqrt(np.mean(residuals["dTime"].values**2))
    
     result["covariance"] = od_orbit_df["covariance"].values
     
