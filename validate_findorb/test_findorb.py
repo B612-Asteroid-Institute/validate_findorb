@@ -252,8 +252,8 @@ def getOrbHorizons(target, t0):
 
     Parameters
     ----------
-    target : str
-        Name of the target to get the orbital state vector for.
+    target : str or list of str
+        Name(s) of the target to get the orbital state vector for.
     t0 : astropy.time.core.Time
         Time object with scale='tdb' format='mjd' for the time of the state vector.
 
@@ -266,7 +266,7 @@ def getOrbHorizons(target, t0):
         target = [target]
     targets_i = []
     for i in target:
-        hobj = Horizons(id=i,epochs=t0.tdb.mjd,location='@sun').vectors()
+        hobj = Horizons(id=i,epochs=t0.tdb.mjd,location='@sun').vectors(refplane="ecliptic",aberrations="geometric",)
         targets_i.append(hobj.to_pandas())
     targets = pd.concat(targets_i, ignore_index=True)
     return Orbits(targets,ids=targets['targetname'].values,epochs=t0+np.zeros(len(target)))
