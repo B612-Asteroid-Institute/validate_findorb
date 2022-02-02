@@ -9,14 +9,15 @@ To install *Validate Find_Orb* as a python package, clone this repository, and `
 ### Installing Dependencies with conda
 To install its dependencies in a new `conda` environment, use this command,
 ```
-conda create -n myenv --file requirements.txt python=3.9
+conda create -n myenv -c defaults -c conda-forge -c astropy --file requirements.txt python=3.9
 ```
+---
 To install on a preexisting conda environment,
 first activate your environment, `conda activate myenv`, then,
 ```
-conda install --file requirements.txt
+conda install -c defaults -c conda-forge -c astropy --file requirements.txt
 ```
-
+---
 Once all the dependencies have been installed, run this command to install the development version of this package,
 ```
 python setup.py develop --no-deps

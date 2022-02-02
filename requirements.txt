@@ -4,3 +4,4 @@ astropy
 astroquery
 matplotlib
 ipykernel
+setuptools>=45
