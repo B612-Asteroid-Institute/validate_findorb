@@ -24,6 +24,7 @@ def ch(di):
     return 'no_dir'
 
 def bashgen(out_dir, error, t1):
+    # t1 needs to be in UTC jd time format
     od = os.path.join(out_dir,'masterRunTEST.sh')
     val=Time.now().utc.value.isoformat(timespec='seconds')
     copy(os.path.dirname(os.path.abspath(__file__))+'/eph2ades.py',out_dir+'/eph2ades.py')
@@ -45,19 +46,19 @@ def bashgen(out_dir, error, t1):
         f.write('bash '+f"'{sear(ed)}'")
 
 def runFO(orbit, observatory_code, t0, dts, astrometric_error=None, backend=FINDORB(),out=None):
+    if astrometric_error is None:
+        astrometric_error = 0
     if out is None:
         outd=None
     else:
         whq1=orbit.ids[0].split(' ')
         nam='_'.join(whq1)
-        outd=os.path.join(out,f"{nam}/{dts.max()}days_{10.:0.0f}mas_{Time.now().utc.value.isoformat(timespec='seconds')}")
+        outd=os.path.join(out,f"{nam}/{dts.max()}days_{astrometric_error:0.0f}mas_{Time.now().utc.value.isoformat(timespec='seconds')}")
     MAS_TO_DEG = 2.777777777777778e-07
     DEG_TO_MAS = 1/MAS_TO_DEG
     observation_times = t0 + dts
     obs = {observatory_code:observation_times}
     ephemeris,ret1= backend._generateEphemeris(orbits=orbit,observers =obs, out_dir=outd)
-    if astrometric_error is None:
-        astrometric_error = 0
 
     ephemeris["RA_sigma_deg"] = astrometric_error*MAS_TO_DEG
     ephemeris["Dec_sigma_deg"] = astrometric_error*MAS_TO_DEG

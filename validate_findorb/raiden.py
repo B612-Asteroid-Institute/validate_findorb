@@ -62,9 +62,20 @@ class Orbits():
         self.df = df
         return
 
+    def __len__(self):
+        return self.num_orbits
+
     def __getitem__(self, i):
-        if isinstance(i, int):
+        if isinstance(i, slice):
+            return Orbits(self.df[i])
+            #if abs(i.start) >= self.num_orbits:
+            #    raise IndexError
+            #if abs(i.stop) > self.num_orbits:
+            #    raise IndexError
+        
+        elif isinstance(i, int):
             i = slice(i, i+1)
-        if i.start >= self.num_orbits:
-            raise IndexError
+            if abs(i.start) >= self.num_orbits and abs(i.stop) > self.num_orbits:
+                raise IndexError
+
         return Orbits(self.df[i])
