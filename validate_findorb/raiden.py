@@ -74,6 +74,13 @@ class Orbits():
             #    raise IndexError
         
         elif isinstance(i, int):
+            if i < 0:
+                i += self.num_orbits
+            try:
+                self.df.loc[i]
+            except:
+                raise IndexError
+
             i = slice(i, i+1)
             if abs(i.start) >= self.num_orbits and abs(i.stop) > self.num_orbits:
                 raise IndexError
