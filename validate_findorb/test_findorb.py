@@ -3,9 +3,10 @@ import numpy as np
 import pandas as pd
 from astropy.time import Time
 from astropy import units as u
+from astroquery.jplhorizons import Horizons
 from shutil import copy
-from thor.orbits import Orbits
-from thor.backend import FINDORB
+from .raiden import Orbits
+from .wrapper import FINDORB
 backend=FINDORB()
 
 def sear(di):
@@ -22,7 +23,8 @@ def ch(di):
         
     return 'no_dir'
 
-def bashgen(out_dir):
+def bashgen(out_dir, error, t1):
+    # t1 needs to be in UTC jd time format
     od = os.path.join(out_dir,'masterRunTEST.sh')
     val=Time.now().utc.value.isoformat(timespec='seconds')
     copy(os.path.dirname(os.path.abspath(__file__))+'/eph2ades.py',out_dir+'/eph2ades.py')
@@ -35,28 +37,28 @@ def bashgen(out_dir):
         f.write('python eph2ades.py '
                 +os.path.join('./ephemeris/500/',ch(ed1),'ephemeris.txt')+
                 ' '+os.path.join('./orbit_determination',psvp)+' '
-               +f'--astrometric_error={0.} --time_error={0.01}'+'\n')
+               +f'--astrometric_error={error} --time_error={0.01}'+'\n')
         f.write('cd orbit_determination/'+'\n')
         ed=os.path.join(out_dir,'orbit_determination/')
-        f.write(f'fo "{psvp}" -O "{ch(ed1)}" -tEjd2459029.5008007498 -j -D "environ.dat"'+'\n'+'cd ..'+'\n') # possibly hardcoded with -tEjd time
+        f.write(f'fo "{psvp}" -O "{ch(ed1)}" -tEjd{t1} -j -D "environ.dat"'+'\n'+'cd ..'+'\n') # possibly hardcoded with -tEjd time
         f.write('cd propagation/'+'\n')
         ed=os.path.join(out_dir,'propagation/')
         f.write('bash '+f"'{sear(ed)}'")
 
-def testFO(orbit, observatory_code, t0, dts, astrometric_error=None, backend=FINDORB(),out=None):
+def runFO(orbit, observatory_code, t0, dts, astrometric_error=None, backend=FINDORB(),out=None):
+    if astrometric_error is None:
+        astrometric_error = 0
     if out is None:
         outd=None
     else:
         whq1=orbit.ids[0].split(' ')
         nam='_'.join(whq1)
-        outd=os.path.join(out,f"{nam}/{dts.max()}days_{10.:0.0f}mas_{Time.now().utc.value.isoformat(timespec='seconds')}")
+        outd=os.path.join(out,f"{nam}/{dts.max()}days_{astrometric_error:0.0f}mas_{Time.now().utc.value.isoformat(timespec='seconds')}")
     MAS_TO_DEG = 2.777777777777778e-07
     DEG_TO_MAS = 1/MAS_TO_DEG
     observation_times = t0 + dts
     obs = {observatory_code:observation_times}
     ephemeris,ret1= backend._generateEphemeris(orbits=orbit,observers =obs, out_dir=outd)
-    if astrometric_error is None:
-        astrometric_error = 0
 
     ephemeris["RA_sigma_deg"] = astrometric_error*MAS_TO_DEG
     ephemeris["Dec_sigma_deg"] = astrometric_error*MAS_TO_DEG
@@ -70,7 +72,7 @@ def testFO(orbit, observatory_code, t0, dts, astrometric_error=None, backend=FIN
 
     od_orbit_df, residuals,ret2 = backend._orbitDetermination(ephemeris, out_dir=outd)
  
-    od_orbit = Orbits.from_df(od_orbit_df)
+    od_orbit = Orbits(od_orbit_df)
     
     prop_orbit,ret3 = backend._propagateOrbits(orbit, observation_times[-1:], out_dir=outd)
 
@@ -95,9 +97,9 @@ def testFO(orbit, observatory_code, t0, dts, astrometric_error=None, backend=FIN
     result["delta vx [m/s]"] = (delta_state[:,3] * u.AU / u.d).to(u.m / u.s).value
     result["delta vy [m/s]"] = (delta_state[:,4] * u.AU / u.d).to(u.m / u.s).value
     result["delta vz [m/s]"] = (delta_state[:,5] * u.AU / u.d).to(u.m / u.s).value
-    result["rms delta ra"] = np.sqrt(np.mean(residuals["dRA"].values**2))
-    result["rms delta dec"] = np.sqrt(np.mean(residuals["dDec"].values**2))
-    result["rms delta time"] = np.sqrt(np.mean(residuals["dTime"].values**2))
+    result["rms delta ra [arcsec]"] = np.sqrt(np.mean(residuals["dRA"].values**2))
+    result["rms delta dec [arcsec]"] = np.sqrt(np.mean(residuals["dDec"].values**2))
+    result["rms delta time [seconds]"] = np.sqrt(np.mean(residuals["dTime"].values**2))
    
     result["covariance"] = od_orbit_df["covariance"].values
     
@@ -108,6 +110,164 @@ def testFO(orbit, observatory_code, t0, dts, astrometric_error=None, backend=FIN
     result.insert(5, "astrometric_error [mas]", astrometric_error)
     result.insert(3, "num_obs", len(ephemeris))
     if out is not None:
-        bashgen(outd)
+        bashgen(outd,astrometric_error,observation_times[-1:].utc.jd)
     
     return result
+
+def testFO(orbits, observatory_code, t0, dts, astrometric_error=None, out=None):
+    '''
+    Runs the end-to-end Find_Orb test for a list of orbits. Generates ephemeris, 
+    conducts orbit determination, and propagates the initial orbits to the final 
+    time and returns the comparison.
+
+    Parameters
+    ----------
+    orbits : orbit object `~validate_findorb.raiden.Orbits`
+        Orbits to be tested.
+    observatory_code : str
+        MPC Observatory code for the observatory to be tested. (500 for Geocenter)
+    t0 : astropy.time.core.Time
+        Time object with scale='tdb' format='mjd' of the initial time of the orbits given.
+    dts : list of floats, array of floats, or 2D array of floats
+        List of observation times after the initial time to test the orbits over. Measured in days.
+    astrometric_error : float or list of floats, optional
+        Astrometric error to be added to the generated observations. 
+        If None, no astrometric error is added. Units are milliarcseconds.
+    out : str, optional
+        Path to the output directory for saving necessary files for this test to be
+        run independently. This includes configuration files, generated files, and bash scripts. 
+        It has the file structure '{out}/{orbit_id}/{days propagated}days_{error}mas_{timestamp}'. 
+        If None, no files are saved.
+    
+    Returns
+    -------
+    result : pandas.DataFrame
+        DataFrame with the results of the test.
+        Has the following columns:
+        orbit_id : str
+            Orbit ID of the object being tested.
+        observatory_code : str
+            MPC Observatory code for the observatory to be tested. (500 for Geocenter)
+        arc_length [days] : float
+            Length of time in days over which the orbits are tested.
+        num_obs : int
+            Number of observations generated in the test.
+        num_obs_fit : int
+            Number of observations used from the ephemeris file in the orbit determination.
+        epoch [mjd] : float
+            Time at the end of the arc in mjd (t0 + final dt day).
+        astrometric_error [mas] : float
+            Astrometric error added to the observations.
+        delta epoch [mjd] : float
+            Difference between the final epochs of the orbit determination and the propagated orbit.
+        delta r [km] : float
+            The absolute distance between the orbit determination result and the propagated orbit.
+            Measured in kilometers.
+        delta v [m/s] : float
+            The absolute velocity difference between the orbit determination result and the propagated orbit.
+            Measured in meters per second.
+        delta x [km] : float
+            The x position difference between the orbit determination result and the propagated orbit.
+            Measured in kilometers.
+        delta y [km] : float
+            The y position difference between the orbit determination result and the propagated orbit.
+            Measured in kilometers.
+        delta z [km] : float
+            The z position difference between the orbit determination result and the propagated orbit.
+            Measured in kilometers.
+        delta vx [m/s] : float
+            The x velocity difference between the orbit determination result and the propagated orbit.
+            Measured in meters per second.
+        delta vy [m/s] : float
+            The y velocity difference between the orbit determination result and the propagated orbit.
+            Measured in meters per second.
+        delta vz [m/s] : float
+            The z velocity difference between the orbit determination result and the propagated orbit.
+            Measured in meters per second.
+        rms delta ra [arcsec] : float
+            The root mean square difference of the Right Acension of the Residuals from Orbit Determination.
+            Measured in arcseconds.
+        rms delta dec [arcsec] : float
+            The root mean square difference of the Declination of the Residuals from Orbit Determination.
+            Measured in arcseconds.
+        rms delta time [seconds] : float
+            The root mean square difference of the Time of the Residuals from Orbit Determination.
+            Measured in seconds.
+        covariance : 2D array converted to 3D array
+            Covariance matrix of the orbit determination result.
+    '''
+    try:
+        dts[0][0]
+    except:
+        dts = [dts]
+    try:
+        astrometric_error[0]
+        errors = astrometric_error
+    except:
+        errors = [astrometric_error]
+    results_i = []
+    for i in range(orbits.num_orbits):
+        for j in range(len(dts)):
+            for k in range(len(errors)):
+                result = runFO(orbits[i],observatory_code,t0,dts[j],astrometric_error=errors[k],out=out)
+                results_i.append(result)
+    results = pd.concat(
+        results_i,
+        ignore_index=True
+    )
+    return results
+
+def loadOrb(data):
+    '''
+    Load orbit data from a .csv file or pandas DataFrame.
+
+    Parameters
+    ----------
+    data: str or pandas.DataFrame
+        Path to the .csv file or pandas DataFrame containing the orbit data.
+        Must have the following columns:
+        x: float
+            x element of the state vector in Astronomical Units.
+        y: float
+            y element of the state vector in Astronomical Units.
+        z: float
+            z element of the state vector in Astronomical Units.
+        vx: float
+            x velocity element of the state vector in Astronomical Units per day.
+        vy: float
+            y velocity element of the state vector in Astronomical Units per day.
+        vz: float
+            z velocity element of the state vector in Astronomical Units per day.
+        epoch or mjd_tdb: float, also can be a astropy.time.core.Time object converted to float
+            Time of the state vector in mjd with a tdb scale.
+    
+    Returns
+    -------
+    orbits : orbit object `~validate_findorb.raiden.Orbits`
+    '''
+    return Orbits(data)
+
+def getOrbHorizons(target, t0):
+    '''
+    Gets the orbital state vector from JPL Horizons for a given target and time.
+
+    Parameters
+    ----------
+    target : str or list of str
+        Name(s) of the target to get the orbital state vector for.
+    t0 : astropy.time.core.Time
+        Time object with scale='tdb' format='mjd' for the time of the state vector.
+
+    Returns
+    -------
+    orbits: orbit object `~validate_findorb.raiden.Orbits`
+    '''
+    
+    if type(target) == str:
+        target = [target]
+    targets_i = []
+    for i in target:
+        hobj = Horizons(id=i,epochs=t0.tdb.mjd,location='@sun').vectors(refplane="ecliptic",aberrations="geometric",)
+        targets_i.append(hobj.to_pandas())
+    targets = pd.concat(targets_i, ignore_index=True)
+    return Orbits(targets,ids=targets['targetname'].values,epochs=t0+np.zeros(len(target)))

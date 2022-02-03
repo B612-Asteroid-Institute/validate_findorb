@@ -2,37 +2,34 @@
 An end-to-end testing package that will be able to compare and test orbit prediction accuracy for the Find_Orb open source integrator.
 See: https://www.projectpluto.com/find_orb.htm for more Find_Orb related information.
 
-## Installation and Dependencies (for now)
-This package currently requires [thor](https://github.com/moeyensj/thor) and *most* of its dependencies and it needs to be running in **development mode**.
+## Installation and Dependencies
 
-Follow these terminal commands to install thor first:
+To install *Validate Find_Orb* as a python package, clone this repository, and `cd` into the folder. Then follow the directions below for your use case,
 
-1.
+### Installing Dependencies with conda
+To install its dependencies in a new `conda` environment, use this command,
 ```
-git clone https://github.com/moeyensj/thor.git
-```
-2.
-```
-cd thor
-```
-3.
-```
-git checkout findorb-dev
-```
-4.
-```
-python setup.py develop
-```
-Then check if its properly installed by typing in the python command line,
-```
->>> import thor
+conda create -n myenv -c defaults -c conda-forge -c astropy --file requirements.txt python=3.9
 ```
 ---
-To install *Validate Find_Orb* as a python package, cd into the folder once cloned and run this in the terminal,
-
+To install on a preexisting conda environment,
+first activate your environment, `conda activate myenv`, then,
+```
+conda install -c defaults -c conda-forge -c astropy --file requirements.txt
+```
+---
+Once all the dependencies have been installed, run this command to install the development version of this package,
+```
+python setup.py develop --no-deps
+```
+### Installing Dependencies with pip
+Just type in the command line,
 ```
 python setup.py develop
 ```
+**Note:** It is not recommended to use `python setup.py install` for installation since this project is still in development and may have frequent updates.
+
+---
 Then check if its properly installed by typing in the python command line,
 ```
 >>> import validate_findorb

@@ -1,0 +1,7 @@
+numpy
+pandas
+astropy
+astroquery
+matplotlib
+ipykernel
+setuptools>=45
