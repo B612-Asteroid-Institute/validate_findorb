@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
+import astropy
 from astropy.time import Time
 from astropy import units as u
 from astroquery.jplhorizons import Horizons
@@ -45,7 +46,13 @@ def bashgen(out_dir, error, t1):
         ed=os.path.join(out_dir,'propagation/')
         f.write('bash '+f"'{sear(ed)}'")
 
-def runFO(orbit, observatory_code, t0, dts, astrometric_error=None, backend=FINDORB(),out=None):
+def runFO(orbit, observatory_code, dts, astrometric_error=None, backend=FINDORB(),out=None):
+    t0 = orbit.epochs[0]
+    if isinstance(dts, astropy.time.core.Time):
+        assert t0 == dts[0], "The first time in the dts should be the first observed time of your orbits"
+        observation_times = dts
+    elif isinstance(dts, (np.ndarray,list)):
+        observation_times = t0 + dts
     if astrometric_error is None:
         astrometric_error = 0
     if out is None:
@@ -53,10 +60,9 @@ def runFO(orbit, observatory_code, t0, dts, astrometric_error=None, backend=FIND
     else:
         whq1=orbit.ids[0].split(' ')
         nam='_'.join(whq1)
-        outd=os.path.join(out,f"{nam}/{dts.max()}days_{astrometric_error:0.0f}mas_{Time.now().utc.value.isoformat(timespec='seconds')}")
+        outd=os.path.join(out,f"{nam}/{dts.max():0.0f}_{astrometric_error:0.0f}mas_{Time.now().utc.value.isoformat(timespec='seconds')}")
     MAS_TO_DEG = 2.777777777777778e-07
     DEG_TO_MAS = 1/MAS_TO_DEG
-    observation_times = t0 + dts
     obs = {observatory_code:observation_times}
     ephemeris,ret1= backend._generateEphemeris(orbits=orbit,observers =obs, out_dir=outd)
 
@@ -114,7 +120,7 @@ def runFO(orbit, observatory_code, t0, dts, astrometric_error=None, backend=FIND
     
     return result
 
-def testFO(orbits, observatory_code, t0, dts, astrometric_error=None, out=None):
+def testFO(orbits, observatory_code, dts, astrometric_error=None, out=None):
     '''
     Runs the end-to-end Find_Orb test for a list of orbits. Generates ephemeris, 
     conducts orbit determination, and propagates the initial orbits to the final 
@@ -130,6 +136,7 @@ def testFO(orbits, observatory_code, t0, dts, astrometric_error=None, out=None):
         Time object with scale='tdb' format='mjd' of the initial time of the orbits given.
     dts : list of floats, array of floats, or 2D array of floats
         List of observation times after the initial time to test the orbits over. Measured in days.
+        NOTE: Anything passed to this parameter must have values in ASCENDING ORDER.
     astrometric_error : float or list of floats, optional
         Astrometric error to be added to the generated observations. 
         If None, no astrometric error is added. Units are milliarcseconds.
@@ -196,10 +203,42 @@ def testFO(orbits, observatory_code, t0, dts, astrometric_error=None, out=None):
         covariance : 2D array converted to 3D array
             Covariance matrix of the orbit determination result.
     '''
-    try:
-        dts[0][0]
-    except:
+    #1-D cases
+    #array of ints np.ndarray: [1,2,3,...]
+    if isinstance(dts, (list,np.ndarray)) and isinstance(dts[0], (int,float)):
         dts = [dts]
+    #list in time object: <Time object: [t1,t2,...]>
+    elif isinstance(dts, astropy.time.core.Time) and isinstance(dts[0], astropy.time.core.Time):
+        dts = [dts]
+    #2-D cases
+    #2d array of ints: [[1,2,3,...],[...]]
+    elif isinstance(dts, (list,np.ndarray)) and isinstance(dts[0], (list,np.ndarray)):
+        pass
+    #2d array of time objects: list([<Time object: [t1,t2,...]>,<Time object: [t1,t2,...]>,...])
+    elif isinstance(dts, (list,np.ndarray)) and isinstance(dts[0], astropy.time.core.Time) and len(dts) == orbits.num_orbits:
+        try:
+            astrometric_error[0]
+            errors = astrometric_error
+        except:
+            errors = [astrometric_error]
+        results_i = []
+        for i in range(orbits.num_orbits):
+        #this will iterate over unique dts for each orbit
+            for k in range(len(errors)):
+                result = runFO(orbits[i],observatory_code,dts[i],astrometric_error=errors[k],out=out)
+                results_i.append(result)
+        results = pd.concat(
+            results_i,
+            ignore_index=True
+        )
+        return results
+    else:
+        raise ValueError('dts must be a list of floats, array of time objects, 2D array of floats, or 2D array of time objects corresponding to each orbit being tested.')
+    #try:
+        # check for 2d array
+      #  dts[0][0]
+    #except:
+    #    dts = [dts]
     try:
         astrometric_error[0]
         errors = astrometric_error
@@ -209,7 +248,7 @@ def testFO(orbits, observatory_code, t0, dts, astrometric_error=None, out=None):
     for i in range(orbits.num_orbits):
         for j in range(len(dts)):
             for k in range(len(errors)):
-                result = runFO(orbits[i],observatory_code,t0,dts[j],astrometric_error=errors[k],out=out)
+                result = runFO(orbits[i],observatory_code,dts[j],astrometric_error=errors[k],out=out)
                 results_i.append(result)
     results = pd.concat(
         results_i,
