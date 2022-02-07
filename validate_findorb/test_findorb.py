@@ -24,19 +24,19 @@ def ch(di):
         
     return 'no_dir'
 
-def bashgen(out_dir, error, t1):
+def bashgen(out_dir, error, t1, obs_code):
     # t1 needs to be in UTC jd time format
     od = os.path.join(out_dir,'masterRunTEST.sh')
     val=Time.now().utc.value.isoformat(timespec='seconds')
     copy(os.path.dirname(os.path.abspath(__file__))+'/eph2ades.py',out_dir+'/eph2ades.py')
     with open(od,'wt') as f:
         f.write('#!/bin/sh'+"\n")
-        ed1=os.path.join(out_dir,'ephemeris/500/')
-        f.write('cd ./ephemeris/500/'+'\n')
+        ed1=os.path.join(out_dir,f'ephemeris/{obs_code}/')
+        f.write(f'cd ./ephemeris/{obs_code}/'+'\n')
         f.write('bash '+f"'{sear(ed1)}'"+'\n'+'cd ..'+'\n'+'cd ..'+'\n')
         psvp=f'gen_{val}_observations.psv' # will integrate this into eph2ades.py
         f.write('python eph2ades.py '
-                +os.path.join('./ephemeris/500/',ch(ed1),'ephemeris.txt')+
+                +os.path.join(f'./ephemeris/{obs_code}/',ch(ed1),'ephemeris.txt')+
                 ' '+os.path.join('./orbit_determination',psvp)+' '
                +f'--astrometric_error={error} --time_error={0.01}'+'\n')
         f.write('cd orbit_determination/'+'\n')
@@ -49,7 +49,7 @@ def bashgen(out_dir, error, t1):
 def runFO(orbit, observatory_code, dts, astrometric_error=None, backend=FINDORB(),out=None):
     t0 = orbit.epochs[0]
     if isinstance(dts, astropy.time.core.Time):
-        assert t0 == dts[0], "The first time in the dts should be the first observed time of your orbits"
+        assert t0 == dts[0], "The first time in the dts should be the observed time of your initial orbits"
         observation_times = dts
     elif isinstance(dts, (np.ndarray,list)):
         observation_times = t0 + dts
@@ -116,7 +116,7 @@ def runFO(orbit, observatory_code, dts, astrometric_error=None, backend=FINDORB(
     result.insert(5, "astrometric_error [mas]", astrometric_error)
     result.insert(3, "num_obs", len(ephemeris))
     if out is not None:
-        bashgen(outd,astrometric_error,observation_times[-1:].utc.jd)
+        bashgen(outd,astrometric_error,observation_times[-1:].utc.jd,observatory_code)
     
     return result
 
@@ -130,11 +130,9 @@ def testFO(orbits, observatory_code, dts, astrometric_error=None, out=None):
     ----------
     orbits : orbit object `~validate_findorb.raiden.Orbits`
         Orbits to be tested.
-    observatory_code : str
-        MPC Observatory code for the observatory to be tested. (500 for Geocenter)
-    t0 : astropy.time.core.Time
-        Time object with scale='tdb' format='mjd' of the initial time of the orbits given.
-    dts : list of floats, array of floats, or 2D array of floats
+    observatory_code : str or list of strings
+        MPC Observatory code(s) for the observatory to be tested. (500 for Geocenter)
+    dts : array of floats, 2D array of floats, or list of astropy.time.core.Time objects with the same length as `orbits`
         List of observation times after the initial time to test the orbits over. Measured in days.
         NOTE: Anything passed to this parameter must have values in ASCENDING ORDER.
     astrometric_error : float or list of floats, optional
@@ -203,9 +201,20 @@ def testFO(orbits, observatory_code, dts, astrometric_error=None, out=None):
         covariance : 2D array converted to 3D array
             Covariance matrix of the orbit determination result.
     '''
+    if isinstance(observatory_code,(list,np.ndarray)) and isinstance(observatory_code[0],str):
+        pass
+    elif isinstance(observatory_code,str):
+        observatory_code = [observatory_code]
+    
+    try:
+        astrometric_error[0]
+        errors = astrometric_error
+    except:
+        errors = [astrometric_error]
+    
     #1-D cases
     #array of ints np.ndarray: [1,2,3,...]
-    if isinstance(dts, (list,np.ndarray)) and isinstance(dts[0], (int,float)):
+    if isinstance(dts, (list,np.ndarray)) and isinstance(dts[0], (int,float,np.int64,np.float64)):
         dts = [dts]
     #list in time object: <Time object: [t1,t2,...]>
     elif isinstance(dts, astropy.time.core.Time) and isinstance(dts[0], astropy.time.core.Time):
@@ -216,17 +225,14 @@ def testFO(orbits, observatory_code, dts, astrometric_error=None, out=None):
         pass
     #2d array of time objects: list([<Time object: [t1,t2,...]>,<Time object: [t1,t2,...]>,...])
     elif isinstance(dts, (list,np.ndarray)) and isinstance(dts[0], astropy.time.core.Time) and len(dts) == orbits.num_orbits:
-        try:
-            astrometric_error[0]
-            errors = astrometric_error
-        except:
-            errors = [astrometric_error]
+        
         results_i = []
         for i in range(orbits.num_orbits):
         #this will iterate over unique dts for each orbit
             for k in range(len(errors)):
-                result = runFO(orbits[i],observatory_code,dts[i],astrometric_error=errors[k],out=out)
-                results_i.append(result)
+                for l in range(len(observatory_code)):
+                    result = runFO(orbits[i],observatory_code[l],dts[i],astrometric_error=errors[k],out=out)
+                    results_i.append(result)
         results = pd.concat(
             results_i,
             ignore_index=True
@@ -239,17 +245,13 @@ def testFO(orbits, observatory_code, dts, astrometric_error=None, out=None):
       #  dts[0][0]
     #except:
     #    dts = [dts]
-    try:
-        astrometric_error[0]
-        errors = astrometric_error
-    except:
-        errors = [astrometric_error]
     results_i = []
     for i in range(orbits.num_orbits):
         for j in range(len(dts)):
             for k in range(len(errors)):
-                result = runFO(orbits[i],observatory_code,dts[j],astrometric_error=errors[k],out=out)
-                results_i.append(result)
+                for l in range(len(observatory_code)):
+                    result = runFO(orbits[i],observatory_code[l],dts[j],astrometric_error=errors[k],out=out)
+                    results_i.append(result)
     results = pd.concat(
         results_i,
         ignore_index=True
