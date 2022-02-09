@@ -38,7 +38,7 @@ def bashgen(out_dir, error, t1, obs_code):
         f.write('python eph2ades.py '
                 +os.path.join(f'./ephemeris/{obs_code}/',ch(ed1),'ephemeris.txt')+
                 ' '+os.path.join('./orbit_determination',psvp)+' '
-               +f'--astrometric_error={error} --time_error={0.01}'+'\n')
+               +f'--astrometric_error={error} --time_error={0.01} --observatory_code={obs_code}'+'\n')
         f.write('cd orbit_determination/'+'\n')
         ed=os.path.join(out_dir,'orbit_determination/')
         f.write(f'fo "{psvp}" -O "{ch(ed1)}" -tEjd{t1} -j -D "environ.dat"'+'\n'+'cd ..'+'\n') # possibly hardcoded with -tEjd time
@@ -49,7 +49,7 @@ def bashgen(out_dir, error, t1, obs_code):
 def runFO(orbit, observatory_code, dts, astrometric_error=None, backend=FINDORB(),out=None):
     t0 = orbit.epochs[0]
     if isinstance(dts, astropy.time.core.Time):
-        assert t0 == dts[0], "The first time in the dts should be the observed time of your initial orbits"
+        #assert t0 == dts[0], "The first time in the dts should be the observed time of your initial orbits"
         observation_times = dts
     elif isinstance(dts, (np.ndarray,list)):
         observation_times = t0 + dts
