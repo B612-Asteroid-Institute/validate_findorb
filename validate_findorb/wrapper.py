@@ -188,6 +188,7 @@ class FINDORB(Backend):
                 # the object ID is not numeric we can work around that.
                 orbit_id_i = f"o{i:07}"
                 orbit_id_path = "_".join(orbits.ids[i].astype(str).split(" "))
+                orbit_id_path = "_".join(orbit_id_path.split("/"))
                 out_dir_i = os.path.join(out_dir_, orbit_id_path)
                 os.makedirs(out_dir_i, exist_ok=True)
                 vectors_txt = os.path.join(out_dir_i, "vectors.txt")
