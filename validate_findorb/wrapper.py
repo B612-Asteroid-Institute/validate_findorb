@@ -188,6 +188,7 @@ class FINDORB(Backend):
                 # the object ID is not numeric we can work around that.
                 orbit_id_i = f"o{i:07}"
                 orbit_id_path = "_".join(orbits.ids[i].astype(str).split(" "))
+                orbit_id_path = "_".join(orbit_id_path.split("/"))
                 out_dir_i = os.path.join(out_dir_, orbit_id_path)
                 os.makedirs(out_dir_i, exist_ok=True)
                 vectors_txt = os.path.join(out_dir_i, "vectors.txt")
@@ -368,6 +369,7 @@ class FINDORB(Backend):
                     # the object ID is not numeric we can work around that.
                     orbit_id_i = f"o{i:07}"
                     orbit_id_path = "_".join(orbits.ids[i].astype(str).split(" "))
+                    orbit_id_path = "_".join(orbit_id_path.split("/"))
                     out_dir_i = os.path.join(out_dir_, orbit_id_path)
                     os.makedirs(out_dir_i, exist_ok=True)
                     ephemeris_txt = os.path.join(out_dir_i, "ephemeris.txt")
@@ -581,6 +583,7 @@ class FINDORB(Backend):
                 orbit_id_short = f"o{i:07d}"
                 if "orbit_id" in _observations.columns:
                     orbit_id_i = "_".join(orbit_id.split(" "))
+                    orbit_id_i = "_".join(orbit_id_i.split("/"))
                 else:
                     orbit_id_i = orbit_id_short
 
