@@ -4,6 +4,8 @@ See: https://www.projectpluto.com/find_orb.htm for more Find_Orb related informa
 
 ## Installation and Dependencies
 
+**This project requires** a Linux Based System, Python 3, and a working *current* installation of Find_Orb (preferably installed with conda). It is beneficial to also have a [conda based package manager](https://docs.conda.io/en/latest/) and [Jupyter](https://jupyter.org/) for ease of use.
+
 To install *Validate Find_Orb* as a python package, clone this repository, and `cd` into the folder. Then follow the directions below for your use case,
 
 ### Installing Dependencies with conda
@@ -34,8 +36,15 @@ Then check if its properly installed by typing in the python command line,
 ```
 >>> import validate_findorb
 ```
+### Setting up `ipykernel`
+To use the demo Jupyter Notebook `validate_findorb_demo.ipynb` you will most likely need to set up a kernel for your environment, just fill in this placeholder and run in the terminal of your environment,
+```
+python -m ipykernel install --user --name myenv --display-name "Python (myenv)"
+```
+You can check if it worked properly if this kernel is in your instance of Jupyter. You should activate it when running the demo notebook.
+
 ---
 BIG NOTE:
-**This project is still in active development** and will have documentation soon!
+**This project is still in active development** and will have full documentation soon!
 
 If you have any more questions email me here: aidan@b612foundation.org
